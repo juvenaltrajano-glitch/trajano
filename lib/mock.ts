@@ -1,5 +1,5 @@
 import {
-  Caption, CaptionPreset, CaptionWord, OverlayConfig,
+  Caption, CaptionPreset, CaptionWord, Clip, OverlayConfig,
   PresetName, Segment, SilenceConfig, VideoEffect, VideoProject,
 } from "./types";
 import { DEFAULT_FORMAT } from "./formats";
@@ -212,6 +212,59 @@ export const MOCK_CAPTIONS = generateMockCaptions(MOCK_SEGMENTS);
 
 // ─── Mock Project ─────────────────────────────────────────────────────────────
 
+// ─── Mock Clips (multi-clip demo) ────────────────────────────────────────────
+
+export const MOCK_CLIPS: Clip[] = [
+  {
+    id: "clip-1",
+    file: null,
+    videoUrl: "/mock-video.mp4",
+    name: "Intro",
+    duration: 20,
+    fps: 30,
+    sourceWidth: 1920,
+    sourceHeight: 1080,
+    segments: MOCK_SEGMENTS.filter((s) => s.startTime < 20),
+    captions: generateMockCaptions(MOCK_SEGMENTS.filter((s) => s.startTime < 20 && s.kind === "keep")),
+    transition: { type: "none", durationFrames: 0 },
+    order: 0,
+  },
+  {
+    id: "clip-2",
+    file: null,
+    videoUrl: "/mock-video.mp4",
+    name: "Main Content",
+    duration: 25,
+    fps: 30,
+    sourceWidth: 1920,
+    sourceHeight: 1080,
+    segments: MOCK_SEGMENTS.filter((s) => s.startTime >= 20 && s.startTime < 45).map((s) => ({
+      ...s, startTime: s.startTime - 20, endTime: s.endTime - 20,
+    })),
+    captions: [],
+    transition: { type: "fade", durationFrames: 15 },
+    order: 1,
+  },
+  {
+    id: "clip-3",
+    file: null,
+    videoUrl: "/mock-video.mp4",
+    name: "Outro",
+    duration: 15,
+    fps: 30,
+    sourceWidth: 1920,
+    sourceHeight: 1080,
+    segments: MOCK_SEGMENTS.filter((s) => s.startTime >= 45).map((s) => ({
+      ...s, startTime: s.startTime - 45, endTime: s.endTime - 45,
+    })),
+    captions: [],
+    transition: { type: "slide-left", durationFrames: 20 },
+    order: 2,
+  },
+];
+
+// ─── Mock Project ─────────────────────────────────────────────────────────────
+
 export const MOCK_PROJECT: VideoProject = {
   file: null,
   videoUrl: "/mock-video.mp4",
@@ -222,6 +275,7 @@ export const MOCK_PROJECT: VideoProject = {
   format: DEFAULT_FORMAT,
   segments: MOCK_SEGMENTS,
   captions: MOCK_CAPTIONS,
+  clips: MOCK_CLIPS,
   preset: "tiktok",
   karaokeMode: true,
   silenceConfig: DEFAULT_SILENCE_CONFIG,

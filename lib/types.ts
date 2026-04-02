@@ -9,7 +9,6 @@ export interface Segment {
   kind: SegmentKind;
 }
 
-// Word-level caption timing for karaoke-style highlighting
 export interface CaptionWord {
   text: string;
   startTime: number; // seconds in trimmed video
@@ -19,9 +18,9 @@ export interface CaptionWord {
 export interface Caption {
   id: string;
   text: string;
-  startTime: number; // seconds in trimmed video
+  startTime: number; // seconds in trimmed (output) video
   endTime: number;
-  words?: CaptionWord[]; // optional word-level timing
+  words?: CaptionWord[];
 }
 
 export type PresetName = "minimal" | "bold" | "tiktok" | "gradient" | "cinematic";
@@ -30,24 +29,23 @@ export interface CaptionPreset {
   name: PresetName;
   label: string;
   fontFamily: string;
-  fontSize: number;        // px at 1080px height
+  fontSize: number;
   fontWeight: number;
   color: string;
   backgroundColor: string;
   backgroundOpacity: number;
-  highlightColor: string;  // word highlight color for karaoke mode
+  highlightColor: string;
   position: "top" | "center" | "bottom";
   animation: "spring" | "fade" | "slide-up" | "pop" | "none";
   padding: number;
   borderRadius: number;
   letterSpacing: number;
   uppercase: boolean;
-  stroke: boolean;         // text stroke/outline
+  stroke: boolean;
   strokeColor: string;
   strokeWidth: number;
 }
 
-// Video output format
 export type FormatId = "vertical" | "square" | "landscape" | "portrait";
 
 export interface VideoFormat {
@@ -56,47 +54,108 @@ export interface VideoFormat {
   sublabel: string;
   width: number;
   height: number;
-  aspectRatio: string; // CSS string e.g. "9/16"
-  icon: string;        // emoji
+  aspectRatio: string;
+  icon: string;
 }
 
-// Effects applied to the video layer
 export interface VideoEffect {
   zoom: boolean;
-  zoomScale: number;     // 1.0 = no zoom, 1.1 = 10% zoom
-  kenBurns: boolean;     // slow pan+zoom
-  blur: boolean;         // blur entire video (for background layer)
+  zoomScale: number;
+  kenBurns: boolean;
+  blur: boolean;
 }
 
-// Optional overlays rendered on top of everything
 export interface OverlayConfig {
   progressBar: boolean;
   progressBarColor: string;
-  progressBarHeight: number; // px at 1080p
+  progressBarHeight: number;
   progressBarPosition: "top" | "bottom";
-  showBackground: boolean;   // blurred video background (fills letterbox)
+  showBackground: boolean;
 }
 
 export interface SilenceConfig {
-  threshold: number;    // dBFS
-  minDuration: number;  // ms
-  padding: number;      // ms
+  threshold: number;
+  minDuration: number;
+  padding: number;
 }
 
+// ─── Multi-clip types ─────────────────────────────────────────────────────────
+
+export type TransitionType =
+  | "none"
+  | "fade"
+  | "slide-left"
+  | "slide-right"
+  | "slide-up"
+  | "slide-down"
+  | "wipe"
+  | "flip"
+  | "clock-wipe";
+
+export interface ClipTransition {
+  type: TransitionType;
+  durationFrames: number; // overlap frames for the transition (e.g. 15 = 0.5s at 30fps)
+}
+
+export interface Clip {
+  id: string;
+  file: File | null;
+  videoUrl: string | null;
+  name: string;             // display name (filename)
+  duration: number;         // seconds
+  fps: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  segments: Segment[];
+  captions: Caption[];
+  transition: ClipTransition; // transition INTO this clip (ignored for first clip)
+  order: number;            // position in the sequence (0-indexed)
+}
+
+// ─── AI suggestion types ──────────────────────────────────────────────────────
+
+export type SuggestionKind =
+  | "reorder"       // suggest a different clip order
+  | "transition"    // suggest a transition type for a cut
+  | "remove"        // suggest removing a segment
+  | "caption"       // suggest caption text improvement
+  | "pacing"        // suggest pacing issue
+  | "hook";         // suggest a stronger opening hook
+
+export interface AISuggestion {
+  id: string;
+  kind: SuggestionKind;
+  priority: "high" | "medium" | "low";
+  title: string;
+  description: string;
+  // Optional actionable payload
+  clipId?: string;
+  segmentId?: string;
+  suggestedOrder?: string[];       // clip IDs in suggested order
+  suggestedTransition?: TransitionType;
+  suggestedCaption?: string;
+}
+
+// ─── Project type (updated for multi-clip) ────────────────────────────────────
+
 export interface VideoProject {
+  // Legacy single-clip fields (kept for backward compat with upload flow)
   file: File | null;
   videoUrl: string | null;
   duration: number;
   fps: number;
-  // Original video dimensions (source)
   sourceWidth: number;
   sourceHeight: number;
-  // Output format (user-selected)
-  format: VideoFormat;
   segments: Segment[];
   captions: Caption[];
+
+  // Multi-clip
+  clips: Clip[];
+
+  // Global settings
+  format: VideoFormat;
   preset: PresetName;
-  karaokeMode: boolean;  // word-by-word highlight
+  karaokeMode: boolean;
   silenceConfig: SilenceConfig;
   effects: VideoEffect;
   overlay: OverlayConfig;
