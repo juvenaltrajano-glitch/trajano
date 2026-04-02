@@ -37,7 +37,12 @@ export default function EditorPage() {
           setSuggestions(generateMockSuggestions(clips));
         } else if (res.ok) {
           const data = await res.json();
-          setSuggestions(data.suggestions ?? []);
+          const parsed = data.suggestions ?? [];
+          // If Claude returned empty array (e.g. JSON parse edge case), fall back to mock
+          setSuggestions(parsed.length > 0 ? parsed : generateMockSuggestions(clips));
+        } else {
+          // API error (500, rate limit, etc.) — fall back to mock so panel isn't empty
+          setSuggestions(generateMockSuggestions(clips));
         }
       } catch {
         setSuggestions(generateMockSuggestions(clips));

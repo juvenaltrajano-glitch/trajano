@@ -182,50 +182,60 @@ interface MultiClipProps {
 const MultiClipComposition: React.FC<MultiClipProps> = ({
   clips, fps, needsBackground, preset, karaokeMode, effects,
 }) => {
+  // Build flat list of Sequence + Transition elements — TransitionSeries requires
+  // direct children, not wrapped in React.Fragment, so we use flatMap
   let trimmedTimeOffset = 0;
 
-  return (
-    <TransitionSeries>
-      {clips.map((clip, clipIndex) => {
-        const keptSegments = clip.segments.filter((s) => s.kind === "keep");
-        const clipFrames = Math.max(
-          1,
-          keptSegments.reduce((sum, s) => sum + Math.round((s.endTime - s.startTime) * fps), 0)
+  const children: React.ReactNode[] = [];
+
+  clips.forEach((clip, clipIndex) => {
+    const keptSegments = clip.segments.filter((s) => s.kind === "keep");
+    const clipFrames = Math.max(
+      1,
+      keptSegments.reduce((sum, s) => sum + Math.round((s.endTime - s.startTime) * fps), 0)
+    );
+
+    const segTrimmedStart = trimmedTimeOffset;
+    trimmedTimeOffset += keptSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0);
+
+    const transition = clip.transition;
+
+    // Transition must come BEFORE the sequence it transitions into, and only
+    // from clip index 1 onwards
+    if (clipIndex > 0 && transition.type !== "none") {
+      const transitionEl = buildTransition(transition.type);
+      if (transitionEl) {
+        children.push(
+          <TransitionSeries.Transition
+            key={`transition-${clip.id}`}
+            timing={
+              transition.type === "flip"
+                ? springTiming({ config: { damping: 200 } })
+                : linearTiming({ durationInFrames: transition.durationFrames })
+            }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            presentation={transitionEl as any}
+          />
         );
+      }
+    }
 
-        const segTrimmedStart = trimmedTimeOffset;
-        trimmedTimeOffset += keptSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0);
+    children.push(
+      <TransitionSeries.Sequence key={`seq-${clip.id}`} durationInFrames={clipFrames}>
+        <ClipLayer
+          clip={clip}
+          fps={fps}
+          needsBackground={needsBackground}
+          preset={preset}
+          karaokeMode={karaokeMode}
+          effects={effects}
+          segTrimmedStart={segTrimmedStart}
+        />
+      </TransitionSeries.Sequence>
+    );
+  });
 
-        const transition = clip.transition;
-        const transitionEl = clipIndex > 0 ? buildTransition(transition.type) : null;
-
-        return (
-          <React.Fragment key={clip.id}>
-            {transitionEl && (
-              <TransitionSeries.Transition
-                timing={transition.type === "flip"
-                  ? springTiming({ config: { damping: 200 } })
-                  : linearTiming({ durationInFrames: transition.durationFrames })}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                presentation={transitionEl as any}
-              />
-            )}
-            <TransitionSeries.Sequence durationInFrames={clipFrames}>
-              <ClipLayer
-                clip={clip}
-                fps={fps}
-                needsBackground={needsBackground}
-                preset={preset}
-                karaokeMode={karaokeMode}
-                effects={effects}
-                segTrimmedStart={segTrimmedStart}
-              />
-            </TransitionSeries.Sequence>
-          </React.Fragment>
-        );
-      })}
-    </TransitionSeries>
-  );
+  return <TransitionSeries>{children}</TransitionSeries>;
 };
 
 // ─── Single-clip (uploaded video, single file flow) ───────────────────────────
