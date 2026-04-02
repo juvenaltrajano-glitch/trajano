@@ -106,37 +106,55 @@ interface PlaceholderProps {
 
 const PlaceholderComposition: React.FC<PlaceholderProps> = ({ captions, fps, preset, karaokeMode }) => {
   const frame = useCurrentFrame();
-  const hue = interpolate(frame, [0, 300], [220, 280], { extrapolateRight: "wrap" });
+  // Animate hue slowly and keep lightness high enough to be clearly visible
+  const hue = interpolate(frame, [0, 300], [240, 300], { extrapolateRight: "wrap" });
+  const pulse = Math.sin(frame / 25) * 0.5 + 0.5; // 0..1
 
   return (
     <AbsoluteFill
       style={{
-        background: `linear-gradient(135deg, hsl(${hue},60%,12%) 0%, hsl(${hue + 40},70%,18%) 100%)`,
+        background: `linear-gradient(135deg, hsl(${hue},55%,20%) 0%, hsl(${hue + 50},65%,30%) 100%)`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      {/* Animated rings */}
+      {/* Animated glow rings */}
       <div style={{
         position: "absolute",
-        width: "40%",
+        width: "45%",
         aspectRatio: "1",
         borderRadius: "50%",
-        border: "1px solid rgba(255,255,255,0.05)",
-        transform: `scale(${1 + Math.sin(frame / 30) * 0.05})`,
+        border: `1.5px solid rgba(255,255,255,${0.12 + pulse * 0.1})`,
+        transform: `scale(${1 + Math.sin(frame / 30) * 0.06})`,
       }} />
       <div style={{
         position: "absolute",
-        width: "60%",
+        width: "68%",
         aspectRatio: "1",
         borderRadius: "50%",
-        border: "1px solid rgba(255,255,255,0.03)",
+        border: `1px solid rgba(255,255,255,${0.06 + pulse * 0.06})`,
         transform: `scale(${1 + Math.sin(frame / 40 + 1) * 0.04})`,
       }} />
 
-      <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 18, fontFamily: "system-ui", textAlign: "center" }}>
-        Upload a video to preview
+      {/* Icon + text */}
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 14,
+        color: "rgba(255,255,255,0.85)", fontFamily: "system-ui", textAlign: "center",
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: "50%",
+          background: "rgba(255,255,255,0.12)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 28,
+          transform: `scale(${1 + pulse * 0.04})`,
+        }}>
+          🎬
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 700, letterSpacing: -0.3 }}>Demo Preview</div>
+        <div style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", lineHeight: 1.4, maxWidth: 260 }}>
+          Upload a video on the home page{"\n"}to see your footage here
+        </div>
       </div>
 
       <CaptionLayer

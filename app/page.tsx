@@ -70,9 +70,7 @@ export default function UploadPage() {
 
   async function handleFilesAccepted(files: File[]) {
     setGlobalError("");
-    const startOrder = clips.length;
-
-    // Queue all files
+    // Always start order from 0 — processFile(file, 0) calls setFile() which clears old clips
     setProcessing((prev) => [
       ...prev,
       ...files.map((f) => ({ fileName: f.name, status: "queued" as const, message: "Waiting…" })),
@@ -81,7 +79,7 @@ export default function UploadPage() {
     // Process sequentially to avoid AudioContext overload
     for (let i = 0; i < files.length; i++) {
       try {
-        await processFile(files[i], startOrder + i);
+        await processFile(files[i], i);
       } catch (err) {
         setProcessing((prev) =>
           prev.map((p) =>

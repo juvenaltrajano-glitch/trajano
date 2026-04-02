@@ -58,13 +58,26 @@ export function AISuggestionsPanel() {
       {/* API key status badge */}
       {hasKey !== null && (
         <div className={clsx(
-          "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px]",
+          "flex flex-col gap-1.5 px-2.5 py-2 rounded-lg text-[11px]",
           hasKey
             ? "bg-emerald-950/40 border border-emerald-800/50 text-emerald-400"
-            : "bg-zinc-900 border border-zinc-700 text-zinc-500"
+            : "bg-zinc-900 border border-zinc-700 text-zinc-400"
         )}>
-          <div className={clsx("w-1.5 h-1.5 rounded-full", hasKey ? "bg-emerald-400" : "bg-zinc-600")} />
-          {hasKey ? "Claude AI — real suggestions" : "No API key — using smart mock"}
+          <div className="flex items-center gap-1.5">
+            <div className={clsx("w-1.5 h-1.5 rounded-full shrink-0", hasKey ? "bg-emerald-400" : "bg-amber-500")} />
+            {hasKey ? "Claude AI — real suggestions active" : "Mock suggestions — no API key found"}
+          </div>
+          {!hasKey && (
+            <div className="text-zinc-500 leading-relaxed space-y-1 mt-0.5">
+              <div>To enable real AI suggestions:</div>
+              <ol className="list-decimal list-inside space-y-0.5 text-zinc-600">
+                <li>Go to <span className="text-zinc-400">vercel.com → your project</span></li>
+                <li>Settings → Environment Variables</li>
+                <li>Add <code className="bg-zinc-800 px-1 rounded text-zinc-300">ANTHROPIC_API_KEY</code></li>
+                <li>Redeploy (Deployments → Redeploy)</li>
+              </ol>
+            </div>
+          )}
         </div>
       )}
 
