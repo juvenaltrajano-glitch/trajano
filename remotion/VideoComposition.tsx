@@ -1,13 +1,52 @@
-import React from "react";
+import React, { useRef, useLayoutEffect } from "react";
 import {
-  AbsoluteFill, Video, Sequence,
+  AbsoluteFill, Sequence,
   interpolate, spring, useCurrentFrame, useVideoConfig,
 } from "remotion";
 
 import { Caption, CaptionPreset, Clip, OverlayConfig, Segment, VideoEffect, VideoFormat } from "@/lib/types";
 import { CaptionLayer } from "./CaptionLayer";
-import { VideoBackground } from "./VideoBackground";
 import { ProgressBar } from "./ProgressBar";
+
+// ─── BlobVideo: raw <video> element controlled by Remotion frame ───────────────
+// Remotion's <Video> component can fail to display blob: URLs in the Player
+// because of internal buffering / preload differences. This component bypasses
+// the Remotion wrapper and directly sets video.currentTime via useLayoutEffect
+// on every frame, which is guaranteed to work with same-origin blob: URLs.
+interface BlobVideoProps {
+  src: string;
+  startFrom: number;
+  style?: React.CSSProperties;
+  muted?: boolean;
+}
+
+const BlobVideo: React.FC<BlobVideoProps> = ({ src, startFrom, style, muted = true }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const ref = useRef<HTMLVideoElement>(null);
+
+  // Run after every render (no deps) so we seek on every Remotion frame
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const targetTime = (startFrom + frame) / fps;
+    // Only seek if meaningfully out of sync (< half a frame tolerance)
+    if (Math.abs(el.currentTime - targetTime) > 0.5 / fps) {
+      el.currentTime = targetTime;
+    }
+  });
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      muted={muted}
+      playsInline
+      preload="auto"
+      style={{ display: "block", ...style }}
+    />
+  );
+};
 
 export interface VideoCompositionProps {
   clips?: Clip[];
@@ -246,7 +285,7 @@ const SingleClipComposition: React.FC<SingleClipProps> = ({
   if (sequenced.length === 0) {
     return (
       <AbsoluteFill>
-        <Video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <BlobVideo src={videoSrc} startFrom={0} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         <CaptionLayer captions={captions} segTrimmedStart={0} fps={fps} preset={preset} karaokeMode={karaokeMode} />
       </AbsoluteFill>
     );
@@ -380,13 +419,25 @@ const SegmentLayer: React.FC<SegmentLayerProps> = ({
 
   return (
     <AbsoluteFill>
-      {needsBackground && <VideoBackground src={src} startFrom={startFrom} />}
+      {needsBackground && (
+        // Blurred background for letterboxing (landscape → vertical)
+        <AbsoluteFill style={{ overflow: "hidden" }}>
+          <div style={{
+            position: "absolute", inset: "-10%",
+            filter: "blur(24px) brightness(0.45) saturate(1.4)",
+          }}>
+            <BlobVideo
+              src={src}
+              startFrom={startFrom}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          </div>
+        </AbsoluteFill>
+      )}
       <AbsoluteFill style={{ overflow: "hidden" }}>
-        {/* Use Video (not OffthreadVideo) — supports blob: URLs from file upload */}
-        <Video
+        <BlobVideo
           src={src}
           startFrom={startFrom}
-          endAt={startFrom + durationInFrames}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             transform: `scale(${videoScale}) translate(${videoTranslateX}%, ${videoTranslateY}%)`,
