@@ -29,9 +29,13 @@ export function ExportPanel() {
           segments: project.segments,
           captions: project.captions,
           fps: project.fps,
-          width: project.width,
-          height: project.height,
+          format: project.format,
+          sourceWidth: project.sourceWidth,
+          sourceHeight: project.sourceHeight,
           preset: PRESETS[project.preset],
+          karaokeMode: project.karaokeMode,
+          effects: project.effects,
+          overlay: project.overlay,
         }),
       });
 
@@ -68,7 +72,8 @@ export function ExportPanel() {
             value={`${(project.duration - keptDuration).toFixed(1)}s`}
           />
           <StatRow label="Caption style" value={project.preset} />
-          <StatRow label="Resolution" value={`${project.width}×${project.height}`} />
+          <StatRow label="Format" value={project.format.label} />
+          <StatRow label="Resolution" value={`${project.format.width}×${project.format.height}`} />
           <StatRow label="FPS" value={String(project.fps)} />
         </div>
       </div>
