@@ -57,6 +57,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         file, videoUrl: url, duration, fps,
         sourceWidth: w, sourceHeight: h,
         segments: [], captions: [],
+        clips: [], // clear mock/old clips so composition uses fresh single-clip path
       },
     })),
 

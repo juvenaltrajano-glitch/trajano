@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useProjectStore } from "@/store/useProjectStore";
 import { AISuggestion } from "@/lib/types";
 import { TRANSITION_LABELS } from "@/lib/clips";
@@ -31,6 +32,14 @@ export function AISuggestionsPanel() {
   const loading = useProjectStore((s) => s.suggestionsLoading);
   const applyReorder = useProjectStore((s) => s.applyReorderSuggestion);
   const applyTransition = useProjectStore((s) => s.applyTransitionSuggestion);
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((d) => setHasKey(d.hasAnthropicKey ?? false))
+      .catch(() => setHasKey(false));
+  }, []);
 
   return (
     <div className="space-y-3">
@@ -45,6 +54,19 @@ export function AISuggestionsPanel() {
           </svg>
         )}
       </div>
+
+      {/* API key status badge */}
+      {hasKey !== null && (
+        <div className={clsx(
+          "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px]",
+          hasKey
+            ? "bg-emerald-950/40 border border-emerald-800/50 text-emerald-400"
+            : "bg-zinc-900 border border-zinc-700 text-zinc-500"
+        )}>
+          <div className={clsx("w-1.5 h-1.5 rounded-full", hasKey ? "bg-emerald-400" : "bg-zinc-600")} />
+          {hasKey ? "Claude AI — real suggestions" : "No API key — using smart mock"}
+        </div>
+      )}
 
       {!loading && suggestions.length === 0 && (
         <p className="text-xs text-zinc-600 leading-relaxed">
@@ -64,12 +86,6 @@ export function AISuggestionsPanel() {
           }
         />
       ))}
-
-      {suggestions.length > 0 && (
-        <p className="text-[11px] text-zinc-700 text-center pt-1">
-          {process.env.NEXT_PUBLIC_HAS_API_KEY ? "Powered by Claude" : "Using mock suggestions · add ANTHROPIC_API_KEY to use Claude"}
-        </p>
-      )}
     </div>
   );
 }

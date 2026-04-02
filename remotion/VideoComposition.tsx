@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  AbsoluteFill, OffthreadVideo, Sequence,
+  AbsoluteFill, Video, Sequence,
   interpolate, spring, useCurrentFrame, useVideoConfig,
 } from "remotion";
 import {
@@ -20,13 +20,10 @@ import { VideoBackground } from "./VideoBackground";
 import { ProgressBar } from "./ProgressBar";
 
 export interface VideoCompositionProps {
-  // Multi-clip mode
   clips?: Clip[];
-  // Single-clip fallback
   videoSrc?: string;
   segments?: Segment[];
   captions?: Caption[];
-  // Global settings
   fps: number;
   format: VideoFormat;
   sourceWidth: number;
@@ -37,32 +34,44 @@ export interface VideoCompositionProps {
   overlay: OverlayConfig;
 }
 
+// A real video src is one that is a blob: URL or a served path (not the mock placeholder)
+function isRealVideo(src: string | null | undefined): boolean {
+  if (!src) return false;
+  return src.startsWith("blob:") || (src.startsWith("/") && src !== "/mock-video.mp4");
+}
+
 export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
   const { clips, fps, format, sourceWidth, sourceHeight, preset, karaokeMode, effects, overlay } = props;
 
-  // Use multi-clip path if clips array is provided and non-empty
   const sortedClips = clips && clips.length > 0
     ? [...clips].sort((a, b) => a.order - b.order)
     : null;
+
+  // Use multi-clip path only when clips have real video sources
+  const realClips = sortedClips?.filter((c) => isRealVideo(c.videoUrl)) ?? null;
+  const useMultiClip = realClips && realClips.length > 0;
 
   const sourceAspect = sourceWidth / sourceHeight;
   const outputAspect = format.width / format.height;
   const needsBackground = overlay.showBackground && Math.abs(sourceAspect - outputAspect) > 0.05;
 
+  const singleSrc = props.videoSrc;
+  const singleIsReal = isRealVideo(singleSrc);
+
   return (
     <AbsoluteFill style={{ backgroundColor: "#000" }}>
-      {sortedClips ? (
+      {useMultiClip ? (
         <MultiClipComposition
-          clips={sortedClips}
+          clips={realClips!}
           fps={fps}
           needsBackground={needsBackground}
           preset={preset}
           karaokeMode={karaokeMode}
           effects={effects}
         />
-      ) : (
+      ) : singleIsReal ? (
         <SingleClipComposition
-          videoSrc={props.videoSrc ?? "/mock-video.mp4"}
+          videoSrc={singleSrc!}
           segments={props.segments ?? []}
           captions={props.captions ?? []}
           fps={fps}
@@ -71,6 +80,14 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
           karaokeMode={karaokeMode}
           effects={effects}
         />
+      ) : (
+        // No real video yet — show animated gradient placeholder with captions
+        <PlaceholderComposition
+          captions={props.captions ?? []}
+          fps={fps}
+          preset={preset}
+          karaokeMode={karaokeMode}
+        />
       )}
 
       {overlay.progressBar && <ProgressBar overlay={overlay} />}
@@ -78,7 +95,62 @@ export const VideoComposition: React.FC<VideoCompositionProps> = (props) => {
   );
 };
 
-// ─── Multi-clip composition using TransitionSeries ────────────────────────────
+// ─── Gradient placeholder (demo / no video uploaded yet) ─────────────────────
+
+interface PlaceholderProps {
+  captions: Caption[];
+  fps: number;
+  preset: CaptionPreset;
+  karaokeMode: boolean;
+}
+
+const PlaceholderComposition: React.FC<PlaceholderProps> = ({ captions, fps, preset, karaokeMode }) => {
+  const frame = useCurrentFrame();
+  const hue = interpolate(frame, [0, 300], [220, 280], { extrapolateRight: "wrap" });
+
+  return (
+    <AbsoluteFill
+      style={{
+        background: `linear-gradient(135deg, hsl(${hue},60%,12%) 0%, hsl(${hue + 40},70%,18%) 100%)`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {/* Animated rings */}
+      <div style={{
+        position: "absolute",
+        width: "40%",
+        aspectRatio: "1",
+        borderRadius: "50%",
+        border: "1px solid rgba(255,255,255,0.05)",
+        transform: `scale(${1 + Math.sin(frame / 30) * 0.05})`,
+      }} />
+      <div style={{
+        position: "absolute",
+        width: "60%",
+        aspectRatio: "1",
+        borderRadius: "50%",
+        border: "1px solid rgba(255,255,255,0.03)",
+        transform: `scale(${1 + Math.sin(frame / 40 + 1) * 0.04})`,
+      }} />
+
+      <div style={{ color: "rgba(255,255,255,0.25)", fontSize: 18, fontFamily: "system-ui", textAlign: "center" }}>
+        Upload a video to preview
+      </div>
+
+      <CaptionLayer
+        captions={captions}
+        segTrimmedStart={0}
+        fps={fps}
+        preset={preset}
+        karaokeMode={karaokeMode}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// ─── Multi-clip with TransitionSeries ─────────────────────────────────────────
 
 interface MultiClipProps {
   clips: Clip[];
@@ -100,20 +172,14 @@ const MultiClipComposition: React.FC<MultiClipProps> = ({
         const keptSegments = clip.segments.filter((s) => s.kind === "keep");
         const clipFrames = Math.max(
           1,
-          keptSegments.reduce(
-            (sum, s) => sum + Math.round((s.endTime - s.startTime) * fps), 0
-          )
+          keptSegments.reduce((sum, s) => sum + Math.round((s.endTime - s.startTime) * fps), 0)
         );
 
         const segTrimmedStart = trimmedTimeOffset;
-        trimmedTimeOffset += keptSegments.reduce(
-          (sum, s) => sum + (s.endTime - s.startTime), 0
-        );
+        trimmedTimeOffset += keptSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0);
 
         const transition = clip.transition;
-        const transitionEl = clipIndex > 0
-          ? buildTransition(transition.type)
-          : null;
+        const transitionEl = clipIndex > 0 ? buildTransition(transition.type) : null;
 
         return (
           <React.Fragment key={clip.id}>
@@ -144,7 +210,7 @@ const MultiClipComposition: React.FC<MultiClipProps> = ({
   );
 };
 
-// ─── Single-clip fallback (original behaviour) ────────────────────────────────
+// ─── Single-clip (uploaded video, single file flow) ───────────────────────────
 
 interface SingleClipProps {
   videoSrc: string;
@@ -175,6 +241,16 @@ const SingleClipComposition: React.FC<SingleClipProps> = ({
       return { ...s, startFrom, durationInFrames, offset, segTrimmedStart };
     });
 
+  // Fallback: if no segments, show full video
+  if (sequenced.length === 0) {
+    return (
+      <AbsoluteFill>
+        <Video src={videoSrc} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <CaptionLayer captions={captions} segTrimmedStart={0} fps={fps} preset={preset} karaokeMode={karaokeMode} />
+      </AbsoluteFill>
+    );
+  }
+
   return (
     <>
       {sequenced.map((s) => {
@@ -203,7 +279,7 @@ const SingleClipComposition: React.FC<SingleClipProps> = ({
   );
 };
 
-// ─── Per-clip layer (for multi-clip) ─────────────────────────────────────────
+// ─── Per-clip layer (multi-clip path) ─────────────────────────────────────────
 
 interface ClipLayerProps {
   clip: Clip;
@@ -218,7 +294,7 @@ interface ClipLayerProps {
 const ClipLayer: React.FC<ClipLayerProps> = ({
   clip, fps, needsBackground, preset, karaokeMode, effects, segTrimmedStart,
 }) => {
-  const src = clip.videoUrl ?? "/mock-video.mp4";
+  const src = clip.videoUrl!;
   let frameOffset = 0;
   let localTrimmed = 0;
 
@@ -305,7 +381,8 @@ const SegmentLayer: React.FC<SegmentLayerProps> = ({
     <AbsoluteFill>
       {needsBackground && <VideoBackground src={src} startFrom={startFrom} />}
       <AbsoluteFill style={{ overflow: "hidden" }}>
-        <OffthreadVideo
+        {/* Use Video (not OffthreadVideo) — supports blob: URLs from file upload */}
+        <Video
           src={src}
           startFrom={startFrom}
           endAt={startFrom + durationInFrames}
@@ -328,7 +405,7 @@ const SegmentLayer: React.FC<SegmentLayerProps> = ({
   );
 };
 
-// ─── Build Remotion transition presentation from TransitionType ───────────────
+// ─── Build Remotion transition ────────────────────────────────────────────────
 
 function buildTransition(type: string) {
   switch (type) {
