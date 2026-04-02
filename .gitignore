@@ -1,0 +1,17 @@
+# Next.js
+.next/
+out/
+build/
+
+# Node
+node_modules/
+
+# Generated
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# Renders
+public/renders/
+
+# Env
+.env*.local
