@@ -1,4 +1,4 @@
-import React, { useRef, useLayoutEffect } from "react";
+import React, { useRef, useLayoutEffect, useEffect } from "react";
 import {
   AbsoluteFill, Sequence,
   interpolate, spring, useCurrentFrame, useVideoConfig,
@@ -9,38 +9,55 @@ import { CaptionLayer } from "./CaptionLayer";
 import { ProgressBar } from "./ProgressBar";
 
 // ─── BlobVideo: raw <video> element controlled by Remotion frame ───────────────
-// Remotion's <Video> component can fail to display blob: URLs in the Player
-// because of internal buffering / preload differences. This component bypasses
-// the Remotion wrapper and directly sets video.currentTime via useLayoutEffect
-// on every frame, which is guaranteed to work with same-origin blob: URLs.
+// Remotion's <Video> component fails with blob: URLs (local uploads) in the Player.
+// This bypasses the wrapper and directly sets video.currentTime on every frame.
+// Key issue: video.readyState may be < 1 (no metadata) for the first few frames,
+// so we must also seek in the loadedmetadata event handler.
 interface BlobVideoProps {
   src: string;
   startFrom: number;
   style?: React.CSSProperties;
-  muted?: boolean;
 }
 
-const BlobVideo: React.FC<BlobVideoProps> = ({ src, startFrom, style, muted = true }) => {
+const BlobVideo: React.FC<BlobVideoProps> = ({ src, startFrom, style }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const ref = useRef<HTMLVideoElement>(null);
+  // Keep latest frame/startFrom in a ref so the event listener can access it
+  // without capturing a stale closure value
+  const seekStateRef = useRef({ frame, startFrom, fps });
+  seekStateRef.current = { frame, startFrom, fps };
 
-  // Run after every render (no deps) so we seek on every Remotion frame
+  // Seek on every Remotion frame — only when video has metadata
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    const targetTime = (startFrom + frame) / fps;
-    // Only seek if meaningfully out of sync (< half a frame tolerance)
-    if (Math.abs(el.currentTime - targetTime) > 0.5 / fps) {
-      el.currentTime = targetTime;
+    if (!el || el.readyState < 1) return; // HAVE_METADATA = 1
+    const t = (startFrom + frame) / fps;
+    if (Math.abs(el.currentTime - t) > 0.5 / fps) {
+      el.currentTime = t;
     }
   });
+
+  // When video first gets its metadata, seek to the current composition position.
+  // This fires once per src change and handles the gap between mount and readyState >= 1.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onReady = () => {
+      const { frame: f, startFrom: sf, fps: rate } = seekStateRef.current;
+      el.currentTime = (sf + f) / rate;
+    };
+    el.addEventListener("loadedmetadata", onReady);
+    // If metadata was already loaded (same blob: URL reused), seek immediately
+    if (el.readyState >= 1) onReady();
+    return () => el.removeEventListener("loadedmetadata", onReady);
+  }, [src]);
 
   return (
     <video
       ref={ref}
       src={src}
-      muted={muted}
+      muted
       playsInline
       preload="auto"
       style={{ display: "block", ...style }}
