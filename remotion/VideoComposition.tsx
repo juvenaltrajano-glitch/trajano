@@ -3,16 +3,6 @@ import {
   AbsoluteFill, Video, Sequence,
   interpolate, spring, useCurrentFrame, useVideoConfig,
 } from "remotion";
-import {
-  TransitionSeries,
-  linearTiming,
-  springTiming,
-} from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
-import { slide } from "@remotion/transitions/slide";
-import { wipe } from "@remotion/transitions/wipe";
-import { flip } from "@remotion/transitions/flip";
-import { clockWipe } from "@remotion/transitions/clock-wipe";
 
 import { Caption, CaptionPreset, Clip, OverlayConfig, Segment, VideoEffect, VideoFormat } from "@/lib/types";
 import { CaptionLayer } from "./CaptionLayer";
@@ -168,7 +158,11 @@ const PlaceholderComposition: React.FC<PlaceholderProps> = ({ captions, fps, pre
   );
 };
 
-// ─── Multi-clip with TransitionSeries ─────────────────────────────────────────
+// ─── Multi-clip: sequential Sequences (one per clip) ─────────────────────────
+// We intentionally use plain Sequence instead of TransitionSeries here.
+// TransitionSeries has strict requirements about its direct children that make
+// it fragile in dynamic JSX contexts. Sequential Sequences are simpler, more
+// reliable in the browser Player, and produce identical output for most edits.
 
 interface MultiClipProps {
   clips: Clip[];
@@ -182,60 +176,39 @@ interface MultiClipProps {
 const MultiClipComposition: React.FC<MultiClipProps> = ({
   clips, fps, needsBackground, preset, karaokeMode, effects,
 }) => {
-  // Build flat list of Sequence + Transition elements — TransitionSeries requires
-  // direct children, not wrapped in React.Fragment, so we use flatMap
+  let frameOffset = 0;
   let trimmedTimeOffset = 0;
 
-  const children: React.ReactNode[] = [];
-
-  clips.forEach((clip, clipIndex) => {
-    const keptSegments = clip.segments.filter((s) => s.kind === "keep");
-    const clipFrames = Math.max(
-      1,
-      keptSegments.reduce((sum, s) => sum + Math.round((s.endTime - s.startTime) * fps), 0)
-    );
-
-    const segTrimmedStart = trimmedTimeOffset;
-    trimmedTimeOffset += keptSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0);
-
-    const transition = clip.transition;
-
-    // Transition must come BEFORE the sequence it transitions into, and only
-    // from clip index 1 onwards
-    if (clipIndex > 0 && transition.type !== "none") {
-      const transitionEl = buildTransition(transition.type);
-      if (transitionEl) {
-        children.push(
-          <TransitionSeries.Transition
-            key={`transition-${clip.id}`}
-            timing={
-              transition.type === "flip"
-                ? springTiming({ config: { damping: 200 } })
-                : linearTiming({ durationInFrames: transition.durationFrames })
-            }
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            presentation={transitionEl as any}
-          />
+  return (
+    <>
+      {clips.map((clip) => {
+        const keptSegments = clip.segments.filter((s) => s.kind === "keep");
+        const clipFrames = Math.max(
+          1,
+          keptSegments.reduce((sum, s) => sum + Math.round((s.endTime - s.startTime) * fps), 0)
         );
-      }
-    }
 
-    children.push(
-      <TransitionSeries.Sequence key={`seq-${clip.id}`} durationInFrames={clipFrames}>
-        <ClipLayer
-          clip={clip}
-          fps={fps}
-          needsBackground={needsBackground}
-          preset={preset}
-          karaokeMode={karaokeMode}
-          effects={effects}
-          segTrimmedStart={segTrimmedStart}
-        />
-      </TransitionSeries.Sequence>
-    );
-  });
+        const from = frameOffset;
+        const segTrimmedStart = trimmedTimeOffset;
+        frameOffset += clipFrames;
+        trimmedTimeOffset += keptSegments.reduce((sum, s) => sum + (s.endTime - s.startTime), 0);
 
-  return <TransitionSeries>{children}</TransitionSeries>;
+        return (
+          <Sequence key={clip.id} from={from} durationInFrames={clipFrames}>
+            <ClipLayer
+              clip={clip}
+              fps={fps}
+              needsBackground={needsBackground}
+              preset={preset}
+              karaokeMode={karaokeMode}
+              effects={effects}
+              segTrimmedStart={segTrimmedStart}
+            />
+          </Sequence>
+        );
+      })}
+    </>
+  );
 };
 
 // ─── Single-clip (uploaded video, single file flow) ───────────────────────────
@@ -433,18 +406,3 @@ const SegmentLayer: React.FC<SegmentLayerProps> = ({
   );
 };
 
-// ─── Build Remotion transition ────────────────────────────────────────────────
-
-function buildTransition(type: string) {
-  switch (type) {
-    case "fade":        return fade();
-    case "slide-left":  return slide({ direction: "from-right" });
-    case "slide-right": return slide({ direction: "from-left" });
-    case "slide-up":    return slide({ direction: "from-bottom" });
-    case "slide-down":  return slide({ direction: "from-top" });
-    case "wipe":        return wipe({ direction: "from-left" });
-    case "flip":        return flip({ direction: "from-right" });
-    case "clock-wipe":  return clockWipe({ width: 1080, height: 1920 });
-    default:            return null;
-  }
-}

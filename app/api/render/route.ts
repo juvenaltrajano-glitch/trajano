@@ -43,12 +43,19 @@ export async function POST(req: NextRequest) {
     // return NextResponse.json({ outputUrl: `/renders/${path.basename(outputFile)}` });
     // --- END REAL RENDER ---
 
-    // MVP stub: simulate a short render delay
-    await new Promise((r) => setTimeout(r, 1500));
-
-    // Return a reference to the mock video as a stand-in output
-    const outputName = `render-${Date.now()}.mp4`;
-    return NextResponse.json({ outputUrl: `/mock-video.mp4?as=${outputName}` });
+    // Server-side render is not yet enabled (requires @remotion/bundler).
+    // Return 501 so the client shows a helpful message instead of a broken download.
+    void body; // consumed above, acknowledged here to avoid unused-var lint
+    return NextResponse.json(
+      {
+        error: "render_not_implemented",
+        message:
+          "Server-side render requires @remotion/bundler which is not enabled in this deployment. " +
+          "Use your browser's built-in screen recorder (Windows + Shift + S, or QuickTime on Mac) " +
+          "to capture the preview player.",
+      },
+      { status: 501 }
+    );
   } catch (err) {
     console.error("[render]", err);
     return NextResponse.json(

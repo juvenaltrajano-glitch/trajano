@@ -54,6 +54,10 @@ export function ExportPanel() {
 
       clearInterval(progressInterval);
 
+      if (res.status === 501) {
+        // Server-side render not yet enabled — show the explanation
+        throw new Error(data.message ?? "Server render not available.");
+      }
       if (!res.ok) throw new Error(data.error ?? "Render failed");
 
       setProgress(100);
@@ -139,14 +143,20 @@ export function ExportPanel() {
 
         {state === "error" && (
           <div className="space-y-3">
-            <div className="p-4 rounded-xl bg-red-950/30 border border-red-800 text-red-400 text-sm">
+            <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-800/60 text-amber-300 text-sm leading-relaxed">
               {error}
             </div>
+            <div className="p-3 rounded-xl bg-zinc-800/50 border border-zinc-700 text-xs text-zinc-400 leading-relaxed space-y-1">
+              <div className="font-medium text-zinc-300">How to save your video now:</div>
+              <div>• <strong>Windows:</strong> Windows + Shift + S → record screen</div>
+              <div>• <strong>Mac:</strong> Cmd + Shift + 5 → screen recording</div>
+              <div>• Play the preview in fullscreen and record</div>
+            </div>
             <button
-              onClick={handleRender}
+              onClick={() => setState("idle")}
               className="w-full py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-zinc-200 font-medium transition-colors"
             >
-              Retry
+              Back
             </button>
           </div>
         )}
