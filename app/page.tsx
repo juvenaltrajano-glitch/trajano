@@ -110,7 +110,7 @@ export default function UploadPage() {
             Upload one or more clips · remove pauses · add captions · export
           </p>
           <p className="text-zinc-700 text-xs font-mono">
-            v0.1 · build 2026-04-02T18:30Z
+            v0.1 · build 2026-04-02T19:45Z
           </p>
         </div>
 
