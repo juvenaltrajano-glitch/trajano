@@ -15,10 +15,21 @@ export function ExportPanel() {
   const [state, setState] = useState<RenderState>("idle");
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
 
   async function handleRender() {
     setState("loading");
+    setProgress(0);
     setError(null);
+
+    // Simulate render progress (0→95% in ~2.5s, jumps to 100% when done)
+    const startTime = Date.now();
+    const duration = 2500;
+    const progressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const p = Math.min(95, Math.round((elapsed / duration) * 95));
+      setProgress(p);
+    }, 50);
 
     try {
       const res = await fetch("/api/render", {
@@ -41,11 +52,15 @@ export function ExportPanel() {
 
       const data = await res.json();
 
+      clearInterval(progressInterval);
+
       if (!res.ok) throw new Error(data.error ?? "Render failed");
 
+      setProgress(100);
       setOutputUrl(data.outputUrl);
       setState("done");
     } catch (err) {
+      clearInterval(progressInterval);
       setError(err instanceof Error ? err.message : "Unknown error");
       setState("error");
     }
@@ -90,9 +105,17 @@ export function ExportPanel() {
         )}
 
         {state === "loading" && (
-          <div className="w-full py-3.5 rounded-xl bg-zinc-800 text-zinc-400 font-semibold flex items-center justify-center gap-3">
-            <Spinner />
-            Rendering…
+          <div className="space-y-3">
+            <div className="w-full py-3.5 rounded-xl bg-zinc-800 text-zinc-400 font-semibold flex items-center justify-center gap-3">
+              <Spinner />
+              Rendering… {progress}%
+            </div>
+            <div className="w-full h-2 rounded-full bg-zinc-700 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-100"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
         )}
 

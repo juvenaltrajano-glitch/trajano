@@ -79,8 +79,8 @@ export default function EditorPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left: Clip list + AI suggestions */}
         <aside className="w-64 shrink-0 border-r border-zinc-800 bg-zinc-900/20 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
-            <div className="flex items-center justify-between mb-3">
+          <div className="p-4 border-b border-zinc-800 flex flex-col min-h-0" style={{ maxHeight: "45%" }}>
+            <div className="flex items-center justify-between mb-3 shrink-0">
               <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Clips</h2>
               <button
                 onClick={() => router.push("/")}
@@ -89,11 +89,13 @@ export default function EditorPage() {
                 + Add clip
               </button>
             </div>
-            <ClipManager />
+            <div className="overflow-y-auto flex-1 min-h-0">
+              <ClipManager />
+            </div>
           </div>
 
           {/* AI Suggestions */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4 min-h-0">
             <AISuggestionsPanel />
           </div>
         </aside>

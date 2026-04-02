@@ -92,7 +92,7 @@ const KaraokeCaption: React.FC<KaraokeCaptionProps> = ({
   return (
     <CaptionContainer preset={preset}>
       <CaptionBox preset={preset} style={containerStyle}>
-        <span style={{ display: "flex", flexWrap: "wrap", gap: "0.25em", justifyContent: "center" }}>
+        <span style={{ display: "inline", textAlign: "center" }}>
           {caption.words?.map((word, i) => {
             const isActive = captionTime >= word.startTime && captionTime < word.endTime;
             const isPast = captionTime >= word.endTime;
@@ -107,22 +107,26 @@ const KaraokeCaption: React.FC<KaraokeCaptionProps> = ({
             const wordScale = isActive ? interpolate(wordSpring, [0, 1], [0.85, 1]) : 1;
 
             return (
-              <span
-                key={i}
-                style={{
-                  ...getTextStyle(preset),
-                  color: isActive
-                    ? preset.highlightColor
-                    : isPast
-                    ? `${preset.color}99`
-                    : preset.color,
-                  transform: `scale(${wordScale})`,
-                  display: "inline-block",
-                  transition: "color 0.08s ease",
-                }}
-              >
-                {preset.uppercase ? word.text.toUpperCase() : word.text}
-              </span>
+              <React.Fragment key={i}>
+                <span
+                  style={{
+                    ...getTextStyle(preset),
+                    color: isActive
+                      ? preset.highlightColor
+                      : isPast
+                      ? `${preset.color}99`
+                      : preset.color,
+                    transform: `scale(${wordScale})`,
+                    display: "inline-block",
+                    transition: "color 0.08s ease",
+                  }}
+                >
+                  {preset.uppercase ? word.text.toUpperCase() : word.text}
+                </span>
+                {i < (caption.words?.length ?? 0) - 1 && (
+                  <span style={{ ...getTextStyle(preset), display: "inline" }}>{" "}</span>
+                )}
+              </React.Fragment>
             );
           })}
         </span>
@@ -192,13 +196,15 @@ function useCaptionAnimation(
   durationInFrames: number,
   preset: CaptionPreset
 ): React.CSSProperties {
-  const exitStart = Math.max(0, durationInFrames - 5);
+  // Guard: proportional fade-in/out so inputRange is always strictly increasing
+  const fadeIn = Math.max(1, Math.min(Math.floor(durationInFrames * 0.25), 5));
+  const fadeOut = Math.max(fadeIn + 1, durationInFrames - fadeIn);
 
   switch (preset.animation) {
     case "spring": {
       const s = spring({ frame, fps, config: { damping: 80, stiffness: 200, mass: 0.6 } });
       const scale = interpolate(s, [0, 1], [0.7, 1]);
-      const opacity = interpolate(frame, [0, 3, exitStart, durationInFrames], [0, 1, 1, 0], {
+      const opacity = interpolate(frame, [0, fadeIn, fadeOut, durationInFrames], [0, 1, 1, 0], {
         extrapolateLeft: "clamp", extrapolateRight: "clamp",
       });
       return { opacity, transform: `scale(${scale})` };
@@ -206,7 +212,7 @@ function useCaptionAnimation(
     case "pop": {
       const s = spring({ frame, fps, config: { damping: 50, stiffness: 400, mass: 0.4 } });
       const scale = interpolate(s, [0, 1], [0.5, 1]);
-      const opacity = interpolate(frame, [0, 2, exitStart, durationInFrames], [0, 1, 1, 0], {
+      const opacity = interpolate(frame, [0, fadeIn, fadeOut, durationInFrames], [0, 1, 1, 0], {
         extrapolateLeft: "clamp", extrapolateRight: "clamp",
       });
       return { opacity, transform: `scale(${scale})` };
@@ -214,7 +220,7 @@ function useCaptionAnimation(
     case "slide-up": {
       const s = spring({ frame, fps, config: { damping: 100, stiffness: 180 } });
       const y = interpolate(s, [0, 1], [30, 0]);
-      const opacity = interpolate(frame, [0, 5, exitStart, durationInFrames], [0, 1, 1, 0], {
+      const opacity = interpolate(frame, [0, fadeIn, fadeOut, durationInFrames], [0, 1, 1, 0], {
         extrapolateLeft: "clamp", extrapolateRight: "clamp",
       });
       return { opacity, transform: `translateY(${y}px)` };
@@ -222,7 +228,7 @@ function useCaptionAnimation(
     case "fade": {
       const opacity = interpolate(
         frame,
-        [0, 5, exitStart, durationInFrames],
+        [0, fadeIn, fadeOut, durationInFrames],
         [0, 1, 1, 0],
         { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
       );
