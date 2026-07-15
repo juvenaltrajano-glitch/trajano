@@ -1,9 +1,0 @@
-# Segredos e dados locais — NUNCA commitar
-.env
-user_data/sentiment.db
-user_data/data/
-user_data/logs/
-user_data/backtest_results/
-user_data/tradesv3*.sqlite*
-__pycache__/
-*.pyc
