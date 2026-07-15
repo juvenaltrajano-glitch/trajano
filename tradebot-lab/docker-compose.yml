@@ -1,0 +1,23 @@
+version: "3.8"
+
+# ============================================================
+# TRADEBOT-LAB — Fase 0
+# Sobe o Freqtrade em modo DRY-RUN (dinheiro fictício).
+# Nenhuma API key de exchange é necessária nesta fase:
+# o dry-run usa apenas dados públicos da Binance.
+# ============================================================
+
+services:
+  freqtrade:
+    image: freqtradeorg/freqtrade:stable
+    container_name: freqtrade
+    restart: unless-stopped
+    volumes:
+      - ./user_data:/freqtrade/user_data
+    ports:
+      # FreqUI (painel web) — acesse http://localhost:8080
+      - "127.0.0.1:8080:8080"
+    command: >
+      trade
+      --config /freqtrade/user_data/config.json
+      --strategy NewsMomentumStrategy
